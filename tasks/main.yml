@@ -1,0 +1,62 @@
+---
+# tasks file for docker
+---
+- name: Installeer apt pakketten 
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: true
+  loop:
+    - apt-transport-https
+    - ca-certificates
+    - curl
+    - gnupg
+    - lsb-release
+
+- name: Voeg de APT key van Docker toe
+  ansible.builtin.apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+
+- name: Voeg Docker repository toe
+  ansible.builtin.apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable"
+    state: present
+    filename: docker
+
+- name: Installeer Docker
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+    state: present
+    update_cache: true
+
+- name: Start Docker
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Wacht op /var/run/docker.sock
+  ansible.builtin.wait_for:
+    path: /var/run/docker.sock
+    state: present
+    timeout: 20
+
+- name: Voeg testuser toe 
+  ansible.builtin.user:
+    name: testuser
+    groups: docker
+    append: true
+
+- name: Start Hello World
+  community.docker.docker_container:
+    name: hello-web
+    image: nginx:alpine
+    state: started
+    restart_policy: always
+    ports:
+      - "80:80"
